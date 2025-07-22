@@ -1,10 +1,11 @@
 from seleniumbase import SB
 from selenium.webdriver.common.by import By
 import time
+from data import login
 
-# difficulty = input("Enter the difficulty level (easy, medium, hard): ").strip().lower()
-# if difficulty not in ["easy", "medium", "hard"]:
-#     print("Invalid difficulty level. Please enter 'easy', 'medium', or 'hard'.")
+# difficulty = input("Enter the difficulty level (Easy, Med., Hard): ").strip().lower()
+# if difficulty not in ["Easy", "Med.", "Hard"]:
+#     print("Invalid difficulty level. Please enter 'East', 'Med.', or 'Hard'.")
 #     exit(1)
 
 # topic = input("Enter the topic (e.g., 'array', 'string'): ").strip().lower()
@@ -12,7 +13,7 @@ import time
 #     print("Invalid topic. Please enter a valid topic.")
 #     exit(1)
 
-difficulty = "easy"
+difficulty = "Easy"
 topic = "array"
 
 with SB(uc=True) as sb:
@@ -22,32 +23,40 @@ with SB(uc=True) as sb:
     sb.uc_gui_click_captcha()
 
     # input username and password and submit
-    sb.type("input[name='login']", "")  # Replace with your username
-    sb.type("input[name='password']", "")  # Replace with your password
+    sb.type("input[name='login']", login['user'])
+    sb.type("input[name='password']", login['pwd'])
     sb.click("#signin_btn")
 
     # open filter
-    sb.click("div[id='radix-:rl:']")
+    sb.click("svg[data-icon='filter']")
 
     # assert filter is visible
     sb.assert_element("div[data-radix-popper-content-wrapper]")
 
     # set difficulty for filter
-    # sb.click("div[id='radix-:ri3:']")
-    # sb.assert_element("div[class='max-h-[210px] overflow-auto rounded-[8px]']")
+    popup = sb.find_element("div[data-radix-popper-content-wrapper]")
+    fields_wrapper = popup
+    for _ in range(4):
+        fields_wrapper = fields_wrapper.find_element(By.XPATH, "./*")
+ 
+    for field in fields_wrapper.find_elements(By.XPATH, "./*"):
+        children = field.find_elements(By.XPATH, "./*")
+        if len(children) >= 2 and "difficulty" in children[1].text.lower():
+            selectors = children[2].find_elements(By.XPATH, "./*")
+            assert len(selectors) == 2, "Expected two selectors"
 
-    parent = sb.find_element("div[class='max-h-[210px] overflow-auto rounded-[8px]']")
-    print(parent)
-    children = parent.find_elements("div[class='text-sd-muted-foreground text-xs w-[86px]'")
-    print(children)
+            selectors[1].click()
+            assert selectors[1].get_attribute("data-state") == "open", "Selector did not open"
 
-    for child in children:
-        if child.text == "Difficulty":
-            row = child.find_element(By.XPATH, "..")
-            row.find_element("div[class='border-sd-input']").click()
+            diff_menu_id = selectors[1].get_attribute("aria-controls")
 
-    time.sleep(10)
+            diff_menu = sb.find_element(f"div[id='{diff_menu_id}']")
 
-    sb.click(f'text={difficulty}')
+            list_cntr = diff_menu.find_element(By.XPATH, "./*")
+            assert len(list_cntr.find_elements(By.XPATH, "./*")) == 3, "Expected three difficulty options"
 
-    time.sleep(5)
+            for option in list_cntr.find_elements(By.XPATH, "./*"):
+                label = option.find_element(By.XPATH, "./*")
+                if difficulty in label.text.lower():
+                    option.click()
+                    break
