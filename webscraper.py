@@ -1,6 +1,7 @@
 from seleniumbase import SB
 from selenium.webdriver.common.by import By
 import time
+from data import login
 
 # difficulty = input("Enter the difficulty level (easy, medium, hard): ").strip().lower()
 # if difficulty not in ["easy", "medium", "hard"]:
@@ -22,8 +23,8 @@ with SB(uc=True) as sb:
     sb.uc_gui_click_captcha()
 
     # input username and password and submit
-    sb.type("input[name='login']", "")  # Replace with your username
-    sb.type("input[name='password']", "")  # Replace with your password
+    sb.type("input[name='login']", login['user'])
+    sb.type("input[name='password']", login['pwd'])
     sb.click("#signin_btn")
 
     # open filter
