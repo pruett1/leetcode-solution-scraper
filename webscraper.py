@@ -1,11 +1,12 @@
 from seleniumbase import SB
 from selenium.webdriver.common.by import By
 import time
+import logging
 from data import login
 
-# difficulty = input("Enter the difficulty level (Easy, Med., Hard): ").strip().lower()
-# if difficulty not in ["Easy", "Med.", "Hard"]:
-#     print("Invalid difficulty level. Please enter 'East', 'Med.', or 'Hard'.")
+# difficulty = input("Enter the difficulty level (easy, med., hard): ").strip().lower()
+# if difficulty not in ["easy", "med.", "hard"]:
+#     print("Invalid difficulty level. Please enter 'easy', 'med.', or 'hard'.")
 #     exit(1)
 
 # topic = input("Enter the topic (e.g., 'array', 'string'): ").strip().lower()
@@ -13,8 +14,17 @@ from data import login
 #     print("Invalid topic. Please enter a valid topic.")
 #     exit(1)
 
+logging.basicConfig(filename='webscraper.log', 
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    filemode='w')
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
 difficulty = "easy"
-topic = "array"
+topic = "greedy"
+
+logger.info(f"Starting webscraper with difficulty: {difficulty}, topic: {topic}")
 
 with SB(uc=True) as sb:
     # login and bypass captcha
@@ -26,6 +36,11 @@ with SB(uc=True) as sb:
     sb.type("input[name='login']", login['user'])
     sb.type("input[name='password']", login['pwd'])
     sb.click("#signin_btn")
+    logger.info("Logged in. Waiting for page to load...")
+
+    # wait for filter to appear
+    sb.wait_for_element("svg[data-icon='filter']")
+    logger.info("Page loaded. Opening filter...")
 
     # open filter
     sb.click("svg[data-icon='filter']")
@@ -38,12 +53,15 @@ with SB(uc=True) as sb:
     fields_wrapper = popup
     for _ in range(4):
         fields_wrapper = fields_wrapper.find_element(By.XPATH, "./*")
+
+    logger.info("Filter opened. Selecting difficulty and topic...")
  
     #select difficulty
     for field in fields_wrapper.find_elements(By.XPATH, "./*"):
         children = field.find_elements(By.XPATH, "./*")
         #check if the field is the difficulty field
-        if len(children) >= 2 and "Difficulty" in children[1].text.lower():
+        if len(children) >= 2 and "difficulty" in children[1].text.lower():
+            logger.info("Found difficulty field, selecting difficulty...")
             selectors = children[2].find_elements(By.XPATH, "./*")
             assert len(selectors) == 2, "Expected two selectors"
 
@@ -59,7 +77,9 @@ with SB(uc=True) as sb:
 
             for option in list_cntr.find_elements(By.XPATH, "./*"):
                 label = option.find_element(By.XPATH, "./*")
+                logger.debug(f"Checking option: {label.text.lower()}")
                 if difficulty in label.text.lower():
+                    logger.info(f"Selecting difficulty: {difficulty}")
                     option.click()
                     break
 
@@ -67,9 +87,12 @@ with SB(uc=True) as sb:
     for field in fields_wrapper.find_elements(By.XPATH, "./*"):
         children = field.find_elements(By.XPATH, "./*")
         #check if the field is the topic field
-        if len(children) >= 2 and "Topics" in children[1].text.lower():
+        if len(children) >= 2 and "topics" in children[1].text.lower():
+            logger.info("Found topic field, selecting topic...")
             selectors = children[2].find_elements(By.XPATH, "./*")
             assert len(selectors) == 2, "Expected two selectors"
+            logger.debug(f"Selectors found: {[s.get_attribute('class') for s in selectors]}")
+            logger.debug(f"Second selector data-state: {selectors[1].get_attribute('data-state')}")
 
             selectors[1].click()
             assert selectors[1].get_attribute("data-state") == "open", "Selector did not open"
@@ -85,10 +108,12 @@ with SB(uc=True) as sb:
             
 
             for option in topics_wrapper.find_elements(By.XPATH, "./*"):
-                label = option.find_element(By.XPATH, "./*")
-                if difficulty in label.text.lower():
+                logger.debug(f"Checking option: {option.text.lower()}")
+                if difficulty in option.text.lower():
+                    logger.info(f"Selecting topic: {topic}")
                     option.click()
                     break
     time.sleep(5)
     #close filter
+    logger.info("Closing filter...")
     sb.click("svg[data-icon='filter']")
