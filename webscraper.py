@@ -13,7 +13,7 @@ from data import login
 #     print("Invalid topic. Please enter a valid topic.")
 #     exit(1)
 
-difficulty = "Easy"
+difficulty = "easy"
 topic = "array"
 
 with SB(uc=True) as sb:
@@ -33,15 +33,17 @@ with SB(uc=True) as sb:
     # assert filter is visible
     sb.assert_element("div[data-radix-popper-content-wrapper]")
 
-    # set difficulty for filter
+    # open filter fields
     popup = sb.find_element("div[data-radix-popper-content-wrapper]")
     fields_wrapper = popup
     for _ in range(4):
         fields_wrapper = fields_wrapper.find_element(By.XPATH, "./*")
  
+    #select difficulty
     for field in fields_wrapper.find_elements(By.XPATH, "./*"):
         children = field.find_elements(By.XPATH, "./*")
-        if len(children) >= 2 and "difficulty" in children[1].text.lower():
+        #check if the field is the difficulty field
+        if len(children) >= 2 and "Difficulty" in children[1].text.lower():
             selectors = children[2].find_elements(By.XPATH, "./*")
             assert len(selectors) == 2, "Expected two selectors"
 
@@ -60,3 +62,33 @@ with SB(uc=True) as sb:
                 if difficulty in label.text.lower():
                     option.click()
                     break
+
+    # select topic
+    for field in fields_wrapper.find_elements(By.XPATH, "./*"):
+        children = field.find_elements(By.XPATH, "./*")
+        #check if the field is the topic field
+        if len(children) >= 2 and "Topics" in children[1].text.lower():
+            selectors = children[2].find_elements(By.XPATH, "./*")
+            assert len(selectors) == 2, "Expected two selectors"
+
+            selectors[1].click()
+            assert selectors[1].get_attribute("data-state") == "open", "Selector did not open"
+
+            topic_menu_id = selectors[1].get_attribute("aria-controls")
+
+            topic_menu = sb.find_element(f"div[id='{topic_menu_id}']")
+
+            topics_wrapper = topic_menu.find_element(By.XPATH, "./*").find_element(By.XPATH, "./*").find_elements(By.XPATH, "./*")
+            assert len(topics_wrapper) > 2, "Expected search and list of topics"
+
+            topics_wrapper = topics_wrapper[1].find_element(By.XPATH, "./*")
+            
+
+            for option in topics_wrapper.find_elements(By.XPATH, "./*"):
+                label = option.find_element(By.XPATH, "./*")
+                if difficulty in label.text.lower():
+                    option.click()
+                    break
+    time.sleep(5)
+    #close filter
+    sb.click("svg[data-icon='filter']")
