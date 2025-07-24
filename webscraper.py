@@ -91,21 +91,25 @@ with SB(uc=True) as sb:
             logger.info("Found topic field, selecting topic...")
             selectors = children[2].find_elements(By.XPATH, "./*")
             assert len(selectors) == 2, "Expected two selectors"
-            logger.debug(f"Selectors found: {[s.get_attribute('class') for s in selectors]}")
-            logger.debug(f"Second selector data-state: {selectors[1].get_attribute('data-state')}")
 
-            selectors[1].click()
+            selectors[1].find_elements(By.XPATH, "./*")[1].click() # click the second child (open arrow) throws error otherwise not sure why
             assert selectors[1].get_attribute("data-state") == "open", "Selector did not open"
 
             topic_menu_id = selectors[1].get_attribute("aria-controls")
+            logger.debug(f"Topic menu ID: {topic_menu_id}")
 
             topic_menu = sb.find_element(f"div[id='{topic_menu_id}']")
+            logger.debug(f"Topic menu found with ID: {topic_menu.get_attribute('id')}")
 
             topics_wrapper = topic_menu.find_element(By.XPATH, "./*").find_element(By.XPATH, "./*").find_elements(By.XPATH, "./*")
-            assert len(topics_wrapper) > 2, "Expected search and list of topics"
+            assert len(topics_wrapper) == 2, "Expected search and list of topics"
+            logger.debug(f"Topics wrapper classes: {[el.get_attribute('class') for el in topics_wrapper]}")
 
             topics_wrapper = topics_wrapper[1].find_element(By.XPATH, "./*")
-            
+            logger.debug(f"Topics wrapper len = {len(topics_wrapper.find_elements(By.XPATH, './*'))}")
+            logger.debug(f"Topics wrapper class: {topics_wrapper.get_attribute('class')}")
+            logger.debug(f"Topics wrapper html: {topics_wrapper.get_attribute('outerHTML')}")
+            logger.debug(f"Topics wrapper inner html: {topics_wrapper.get_attribute('innerHTML')}")
 
             for option in topics_wrapper.find_elements(By.XPATH, "./*"):
                 logger.debug(f"Checking option: {option.text.lower()}")
@@ -113,7 +117,7 @@ with SB(uc=True) as sb:
                     logger.info(f"Selecting topic: {topic}")
                     option.click()
                     break
-    time.sleep(5)
+    time.sleep(500)
     #close filter
     logger.info("Closing filter...")
     sb.click("svg[data-icon='filter']")
