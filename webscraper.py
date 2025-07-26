@@ -96,28 +96,25 @@ with SB(uc=True) as sb:
             assert selectors[1].get_attribute("data-state") == "open", "Selector did not open"
 
             topic_menu_id = selectors[1].get_attribute("aria-controls")
-            logger.debug(f"Topic menu ID: {topic_menu_id}")
 
             topic_menu = sb.find_element(f"div[id='{topic_menu_id}']")
-            logger.debug(f"Topic menu found with ID: {topic_menu.get_attribute('id')}")
 
             topics_wrapper = topic_menu.find_element(By.XPATH, "./*").find_element(By.XPATH, "./*").find_elements(By.XPATH, "./*")
             assert len(topics_wrapper) == 2, "Expected search and list of topics"
-            logger.debug(f"Topics wrapper classes: {[el.get_attribute('class') for el in topics_wrapper]}")
+            logger.info("Waiting 3 seconds for topics to load...")
+            time.sleep(3) # wait for topics to load
 
             topics_wrapper = topics_wrapper[1].find_element(By.XPATH, "./*")
-            logger.debug(f"Topics wrapper len = {len(topics_wrapper.find_elements(By.XPATH, './*'))}")
-            logger.debug(f"Topics wrapper class: {topics_wrapper.get_attribute('class')}")
-            logger.debug(f"Topics wrapper html: {topics_wrapper.get_attribute('outerHTML')}")
-            logger.debug(f"Topics wrapper inner html: {topics_wrapper.get_attribute('innerHTML')}")
-
+            logger.debug(f"Topics wrapper children len = {len(topics_wrapper.find_elements(By.XPATH, './*'))}")
+        
             for option in topics_wrapper.find_elements(By.XPATH, "./*"):
-                logger.debug(f"Checking option: {option.text.lower()}")
-                if difficulty in option.text.lower():
+                logger.debug(f"Checking option: {option.text.lower()} against topic: {topic}")
+                if topic in option.text.lower():
                     logger.info(f"Selecting topic: {topic}")
                     option.click()
                     break
-    time.sleep(500)
+    
     #close filter
     logger.info("Closing filter...")
     sb.click("svg[data-icon='filter']")
+    time.sleep(5)
