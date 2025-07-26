@@ -1,11 +1,12 @@
 from seleniumbase import SB
 from selenium.webdriver.common.by import By
 import time
+import logging
 from data import login
 
-# difficulty = input("Enter the difficulty level (Easy, Med., Hard): ").strip().lower()
-# if difficulty not in ["Easy", "Med.", "Hard"]:
-#     print("Invalid difficulty level. Please enter 'East', 'Med.', or 'Hard'.")
+# difficulty = input("Enter the difficulty level (easy, med., hard): ").strip().lower()
+# if difficulty not in ["easy", "med.", "hard"]:
+#     print("Invalid difficulty level. Please enter 'easy', 'med.', or 'hard'.")
 #     exit(1)
 
 # topic = input("Enter the topic (e.g., 'array', 'string'): ").strip().lower()
@@ -13,8 +14,17 @@ from data import login
 #     print("Invalid topic. Please enter a valid topic.")
 #     exit(1)
 
-difficulty = "Easy"
-topic = "array"
+logging.basicConfig(filename='webscraper.log', 
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    filemode='w')
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+difficulty = "easy"
+topic = "greedy"
+
+logger.info(f"Starting webscraper with difficulty: {difficulty}, topic: {topic}")
 
 with SB(uc=True) as sb:
     # login and bypass captcha
@@ -26,6 +36,11 @@ with SB(uc=True) as sb:
     sb.type("input[name='login']", login['user'])
     sb.type("input[name='password']", login['pwd'])
     sb.click("#signin_btn")
+    logger.info("Logged in. Waiting for page to load...")
+
+    # wait for filter to appear
+    sb.wait_for_element("svg[data-icon='filter']")
+    logger.info("Page loaded. Opening filter...")
 
     # open filter
     sb.click("svg[data-icon='filter']")
@@ -33,15 +48,20 @@ with SB(uc=True) as sb:
     # assert filter is visible
     sb.assert_element("div[data-radix-popper-content-wrapper]")
 
-    # set difficulty for filter
+    # open filter fields
     popup = sb.find_element("div[data-radix-popper-content-wrapper]")
     fields_wrapper = popup
     for _ in range(4):
         fields_wrapper = fields_wrapper.find_element(By.XPATH, "./*")
+
+    logger.info("Filter opened. Selecting difficulty and topic...")
  
+    #select difficulty
     for field in fields_wrapper.find_elements(By.XPATH, "./*"):
         children = field.find_elements(By.XPATH, "./*")
+        #check if the field is the difficulty field
         if len(children) >= 2 and "difficulty" in children[1].text.lower():
+            logger.info("Found difficulty field, selecting difficulty...")
             selectors = children[2].find_elements(By.XPATH, "./*")
             assert len(selectors) == 2, "Expected two selectors"
 
@@ -57,6 +77,44 @@ with SB(uc=True) as sb:
 
             for option in list_cntr.find_elements(By.XPATH, "./*"):
                 label = option.find_element(By.XPATH, "./*")
+                logger.debug(f"Checking option: {label.text.lower()}")
                 if difficulty in label.text.lower():
+                    logger.info(f"Selecting difficulty: {difficulty}")
                     option.click()
                     break
+
+    # select topic
+    for field in fields_wrapper.find_elements(By.XPATH, "./*"):
+        children = field.find_elements(By.XPATH, "./*")
+        #check if the field is the topic field
+        if len(children) >= 2 and "topics" in children[1].text.lower():
+            logger.info("Found topic field, selecting topic...")
+            selectors = children[2].find_elements(By.XPATH, "./*")
+            assert len(selectors) == 2, "Expected two selectors"
+
+            selectors[1].find_elements(By.XPATH, "./*")[1].click() # click the second child (open arrow) throws error otherwise not sure why
+            assert selectors[1].get_attribute("data-state") == "open", "Selector did not open"
+
+            topic_menu_id = selectors[1].get_attribute("aria-controls")
+
+            topic_menu = sb.find_element(f"div[id='{topic_menu_id}']")
+
+            topics_wrapper = topic_menu.find_element(By.XPATH, "./*").find_element(By.XPATH, "./*").find_elements(By.XPATH, "./*")
+            assert len(topics_wrapper) == 2, "Expected search and list of topics"
+            logger.info("Waiting 3 seconds for topics to load...")
+            time.sleep(3) # wait for topics to load
+
+            topics_wrapper = topics_wrapper[1].find_element(By.XPATH, "./*")
+            logger.debug(f"Topics wrapper children len = {len(topics_wrapper.find_elements(By.XPATH, './*'))}")
+        
+            for option in topics_wrapper.find_elements(By.XPATH, "./*"):
+                logger.debug(f"Checking option: {option.text.lower()} against topic: {topic}")
+                if topic in option.text.lower():
+                    logger.info(f"Selecting topic: {topic}")
+                    option.click()
+                    break
+    
+    #close filter
+    logger.info("Closing filter...")
+    sb.click("svg[data-icon='filter']")
+    time.sleep(5)

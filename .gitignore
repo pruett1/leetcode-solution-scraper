@@ -1,3 +1,4 @@
 downloaded_files/
 data.py
 __pycache__/
+*.log
