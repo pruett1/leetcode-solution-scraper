@@ -117,4 +117,36 @@ with SB(uc=True) as sb:
     #close filter
     logger.info("Closing filter...")
     sb.click("svg[data-icon='filter']")
-    time.sleep(5)
+    # time.sleep(5)
+
+    problem_list = sb.get_element("svg[data-icon='filter']")
+    for _ in range(7):
+        problem_list = problem_list.find_element(By.XPATH, "..")
+
+    assert len(problem_list.find_elements(By.XPATH, "./*")) == 2, "Expected two children at this level"
+
+    problem_list = problem_list.find_elements(By.XPATH, "./*")[1].find_element(By.XPATH, "./*")
+    logger.info(f"problem_list children len = {len(problem_list.find_elements(By.XPATH, './*'))}")
+    problem_list_class = problem_list.get_attribute("class").replace(" ", ".")
+    problem_list_len = len(problem_list.find_elements(By.XPATH, "./*"))
+
+    for i in range(1, problem_list_len+1):
+        # Because changing the page, need to re-fetch the problem list each time
+        problem_list = sb.get_element("svg[data-icon='filter']")
+        for _ in range(7):
+            problem_list = problem_list.find_element(By.XPATH, "..")
+        problem_list = problem_list.find_elements(By.XPATH, "./*")[1].find_element(By.XPATH, "./*")
+
+        # Get the i-th problem (1 indexed)
+        problem = problem_list.find_element(By.XPATH, f"./*[{i}]")
+        assert problem.get_attribute("tagName").lower() == "a", "Expected problem to be an a tag"
+        problem.click()
+        logger.info(f"Clicked on problem: {sb.get_current_url()}")
+
+        time.sleep(5)
+
+        # Go back to the problem list
+        sb.driver.back()
+        logger.info("Navigated back to problem list")
+        time.sleep(3)
+
