@@ -3,6 +3,7 @@ from selenium.webdriver.common.by import By
 import time
 import logging
 from data import login
+import json
 
 # difficulty = input("Enter the difficulty level (easy, med., hard): ").strip().lower()
 # if difficulty not in ["easy", "med.", "hard"]:
@@ -127,26 +128,77 @@ with SB(uc=True) as sb:
 
     problem_list = problem_list.find_elements(By.XPATH, "./*")[1].find_element(By.XPATH, "./*")
     logger.info(f"problem_list children len = {len(problem_list.find_elements(By.XPATH, './*'))}")
-    problem_list_class = problem_list.get_attribute("class").replace(" ", ".")
     problem_list_len = len(problem_list.find_elements(By.XPATH, "./*"))
 
-    for i in range(1, problem_list_len+1):
+    problems_data = []
+
+    for i in range(1, problem_list_len + 1):
         # Because changing the page, need to re-fetch the problem list each time
+        sb.wait_for_element("svg[data-icon='filter']") # wait for page to load
         problem_list = sb.get_element("svg[data-icon='filter']")
         for _ in range(7):
             problem_list = problem_list.find_element(By.XPATH, "..")
         problem_list = problem_list.find_elements(By.XPATH, "./*")[1].find_element(By.XPATH, "./*")
 
         # Get the i-th problem (1 indexed)
+        logger.debug(f"len of problem_list children: {len(problem_list.find_elements(By.XPATH, './*'))}, fetching problem {i}")
+        while i > len(problem_list.find_elements(By.XPATH, "./*")):
+            logger.warning(f"Problem {i} does not exist")
+            sb.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            logger.info("Scrolled to bottom of page, waiting for more problems to load...")
+            time.sleep(1) # wait for problems to load
+
+            problem_list = sb.get_element("svg[data-icon='filter']")
+            for _ in range(7):
+                problem_list = problem_list.find_element(By.XPATH, "..")
+            problem_list = problem_list.find_elements(By.XPATH, "./*")[1].find_element(By.XPATH, "./*")
+
+            logger.debug(f"len of problem_list children after scroll: {len(problem_list.find_elements(By.XPATH, './*'))}")
+
         problem = problem_list.find_element(By.XPATH, f"./*[{i}]")
         assert problem.get_attribute("tagName").lower() == "a", "Expected problem to be an a tag"
         problem.click()
         logger.info(f"Clicked on problem: {sb.get_current_url()}")
 
-        time.sleep(5)
+        # wait for the problem description to load
+        sb.wait_for_element("div[data-track-load='description_content']")
+        desc = sb.get_element("div[data-track-load='description_content']")
+
+        # set up data structure to hold problem data
+        data = {"desc": "",
+                "examples": [],
+                "constraints": "",
+                "solution": ""}
+
+        # get problem description data
+        data_ind = "desc" # set initial data index
+        text = ""
+        for elem in desc.find_elements(By.XPATH, "./*"):
+            logger.debug(f"Current data_ind: {data_ind}, text: {text}")
+            if "example" in elem.text.strip().lower()[:7] and data_ind != "examples":
+                data[data_ind] = text.strip()
+                text = ""
+                data_ind = "examples"
+            elif data_ind == "examples" and "example" in elem.text.strip().lower()[:7]:
+                data[data_ind].append(text.strip()[11:]) # remove "Example N:\n" prefix
+                text = ""
+            elif "constraints" in elem.text.strip().lower():
+                data[data_ind].append(text.strip()[11:]) # remove "Example N:\n" prefix
+                text = ""
+                data_ind = "constraints"
+
+            text += elem.text.strip() + "\n"
+        
+        data[data_ind] = text.strip()[13:] # remove "Constraints:\n" prefix
+
+        problems_data.append(data)
+
+        logger.debug(f"Data collected for problem {i}: {data}")
 
         # Go back to the problem list
         sb.driver.back()
         logger.info("Navigated back to problem list")
-        time.sleep(3)
 
+    with open(f"output_{difficulty}_{topic}.json", "w") as f:
+        json.dump(problems_data, f, indent=4)
+        logger.info(f"Saved problems to output_{difficulty}_{topic}.json")
