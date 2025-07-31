@@ -160,6 +160,14 @@ with SB(uc=True) as sb:
         problem.click()
         logger.info(f"Clicked on problem: {sb.get_current_url()}")
 
+        # Check if premium-only message exists
+        premium_message = "Thanks for using LeetCode! To view this question you must subscribe to premium."
+        premium_divs = sb.find_elements(By.XPATH, f".//div[contains(text(), '{premium_message}')]")
+        if premium_divs:
+            logger.warning("Premium-only problem detected, skipping...")
+            sb.driver.back()
+            continue
+
         # wait for the problem description to load
         sb.wait_for_element("div[data-track-load='description_content']")
         desc = sb.get_element("div[data-track-load='description_content']")
@@ -167,7 +175,7 @@ with SB(uc=True) as sb:
         # set up data structure to hold problem data
         data = {"desc": "",
                 "examples": [],
-                "constraints": "",
+                "constraints": [],
                 "solution": ""}
 
         # get problem description data
@@ -175,21 +183,26 @@ with SB(uc=True) as sb:
         text = ""
         for elem in desc.find_elements(By.XPATH, "./*"):
             logger.debug(f"Current data_ind: {data_ind}, text: {text}")
+            logger.debug(f"Processing element: {elem.text.strip()}")
             if "example" in elem.text.strip().lower()[:7] and data_ind != "examples":
+                logger.info(f"Found example section, switching data index to 'examples' from '{data_ind}'")
                 data[data_ind] = text.strip()
                 text = ""
                 data_ind = "examples"
             elif data_ind == "examples" and "example" in elem.text.strip().lower()[:7]:
+                logger.info("Continuing to collect examples")
                 data[data_ind].append(text.strip()[11:]) # remove "Example N:\n" prefix
                 text = ""
-            elif "constraints" in elem.text.strip().lower():
+            elif "constraints" in elem.text.strip().lower()[:11] and data_ind != "constraints":
+                logger.info(f"Found constraints section, switching data index to 'constraints' from '{data_ind}'")
                 data[data_ind].append(text.strip()[11:]) # remove "Example N:\n" prefix
                 text = ""
                 data_ind = "constraints"
 
             text += elem.text.strip() + "\n"
         
-        data[data_ind] = text.strip()[13:] # remove "Constraints:\n" prefix
+        text = text.strip()[13:] # remove "Constraints:\n" prefix
+        data[data_ind] = text.split("\n") if data_ind == "constraints" else text # split constraints into list
 
         problems_data.append(data)
 
@@ -198,6 +211,7 @@ with SB(uc=True) as sb:
         # Go back to the problem list
         sb.driver.back()
         logger.info("Navigated back to problem list")
+        time.sleep(3) # give time for the page to load
 
     with open(f"output_{difficulty}_{topic}.json", "w") as f:
         json.dump(problems_data, f, indent=4)
