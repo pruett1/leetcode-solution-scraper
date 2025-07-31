@@ -5,25 +5,30 @@ import logging
 from data import login
 import json
 
+class NewLineFormatter(logging.Formatter):
+    def format(self, record):
+        message = super().format(record)
+        return message.replace("\n", "\n                                  ")
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+file_handler = logging.FileHandler('webscraper.log', mode='w')
+file_handler.setFormatter(NewLineFormatter('%(asctime)s - %(levelname)s - %(message)s'))
+logger.addHandler(file_handler)
+
 # difficulty = input("Enter the difficulty level (easy, med., hard): ").strip().lower()
 # if difficulty not in ["easy", "med.", "hard"]:
 #     print("Invalid difficulty level. Please enter 'easy', 'med.', or 'hard'.")
 #     exit(1)
 
 # topic = input("Enter the topic (e.g., 'array', 'string'): ").strip().lower()
-# if topic not in ["array", "string"]:
-#     print("Invalid topic. Please enter a valid topic.")
-#     exit(1)
 
-logging.basicConfig(filename='webscraper.log', 
-                    format='%(asctime)s - %(levelname)s - %(message)s',
-                    filemode='w')
-
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
+# lang = input("Enter the programming language (e.g., 'python3'): ").strip().lower()
 
 difficulty = "easy"
 topic = "greedy"
+lang = "python3"
 
 logger.info(f"Starting webscraper with difficulty: {difficulty}, topic: {topic}")
 
@@ -204,10 +209,30 @@ with SB(uc=True) as sb:
         text = text.strip()[13:] # remove "Constraints:\n" prefix
         data[data_ind] = text.split("\n") if data_ind == "constraints" else text # split constraints into list
 
+        # get solution
+        logger.info("Finished collecting problem description, now collecting solution...")
+        data_ind = "solution"
+        sb.get_element("div[id='solutions_tab']").click()
+        sb.wait_for_element(By.XPATH, "//span[contains(text(), 'All')]")
+        all_langs = sb.find_elements(By.XPATH, "//span[contains(text(), 'All')]")
+
+        assert all_langs, "No all language selector found"
+        assert len(all_langs) == 1, "Expected one all language selector"
+        # Get the next sibling element after 'All' (the language selector)
+        lang_wrapper = all_langs[0].find_element(By.XPATH, "..").find_elements(By.XPATH, "./*")[2]
+
+        for language in lang_wrapper.find_elements(By.XPATH, "./*"):
+            logger.debug(f"Checking language: {language.text.lower()}")
+            if language.text.lower() == lang:
+                logger.info(f"Selecting language: {language.text}")
+                language.click()
+                break
+
         problems_data.append(data)
 
-        logger.debug(f"Data collected for problem {i}: {data}")
-
+        logger.debug(f"Data collected for problem {i}")
+        for key, value in data.items():
+            logger.debug(f"{key}: {value}")
         # Go back to the problem list
         sb.driver.back()
         logger.info("Navigated back to problem list")
