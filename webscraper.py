@@ -137,7 +137,8 @@ with SB(uc=True) as sb:
 
     problems_data = []
 
-    for i in range(1, 2):
+    # for i in range(2, problem_list_len + 1): # the first problem is always the daily problem which may not be the right difficulty/topic
+    for i in range(2, 3):
         # Because changing the page, need to re-fetch the problem list each time
         sb.wait_for_element("svg[data-icon='filter']") # wait for page to load
         problem_list = sb.get_element("svg[data-icon='filter']")
@@ -213,25 +214,20 @@ with SB(uc=True) as sb:
         logger.info("Finished collecting problem description, now collecting solution...")
         data_ind = "solution"
         sb.get_element("div[id='solutions_tab']").click()
-        sb.wait_for_element(By.XPATH, "//button[contains(text(), 'Share my solution')]") # wait for solution wrapper to load
-        solution_wrapper = sb.find_element(By.XPATH, "//button[contains(text(), 'Share my solution')]")
-        logger.debug(f"html of solution_wrapper parent: {solution_wrapper.find_element(By.XPATH, "../..").get_attribute('outerHTML')}") # NOTE: this log needs to be here 
-        #                                                                                                                      else fails. probably causes wrapper to load
-        solution_wrapper = solution_wrapper.find_element(By.XPATH, "../..")
-        logger.debug(f"len of solution_wrapper children: {len(solution_wrapper.find_elements(By.XPATH, './*'))}") # NOTE: this log needs to be here fails without
-        #                                                                                                           probably causes wrapper to load
-        solution_wrapper = solution_wrapper.find_elements(By.XPATH, "./*")[2].find_elements(By.XPATH, "./*")[2].find_elements(By.XPATH, "./*")[0]
 
-        logger.debug(f"len of solution_wrapper children: {len(solution_wrapper.find_elements(By.XPATH, './*'))}")
-
+        solution_wrapper = sb.get_element("div.relative.h-full.overflow-auto.transition-opacity")
+        solution_wrapper = solution_wrapper.find_elements(By.XPATH, "./*")[2]
+        solution_wrapper = solution_wrapper.find_elements(By.XPATH, "./*")[0]
+        # logger.debug(f"<{solution_wrapper.tag_name} {solution_wrapper.get_attribute('outerHTML').split('>')[0][len(solution_wrapper.tag_name)+1:]}>")
         solutions_len = len(solution_wrapper.find_elements(By.XPATH, "./*"))
-        for i in range(1, min(4, solutions_len)+1):
-            # when go back from solution, the language filter is reset so need to select language every time
+
+        for j in range(1, min(4, solutions_len)+1):
+            # when go back from solution, the language filter sometimes resets so need to select language every time
             sb.wait_for_element(By.XPATH, "//span[contains(text(), 'All')]")
             all_langs = sb.find_elements(By.XPATH, "//span[contains(text(), 'All')]")
-
+            logger.debug(f"Found {len(all_langs)} 'All' language selectors")
+            
             assert all_langs, "No all language selector found"
-            assert len(all_langs) == 1, "Expected one all language selector"
             # Get the next sibling element after 'All' (the language selector)
             lang_wrapper = all_langs[0].find_element(By.XPATH, "..").find_elements(By.XPATH, "./*")[2]
 
@@ -239,15 +235,23 @@ with SB(uc=True) as sb:
                 logger.debug(f"Checking language: {language.text.lower()}")
                 if language.text.lower() == lang:
                     logger.info(f"Selecting language: {language.text}")
+                    if language.get_attribute("style") == "order: -1;":
+                        logger.debug("Language is already selected, skipping click")
+                        break
                     language.click()
                     break
 
-            solution_wrapper = sb.find_element(By.XPATH, "//button[contains(text(), 'Share my solution')]")
-            solution_wrapper = solution_wrapper.find_element(By.XPATH, "../..").find_elements(By.XPATH, "./*")[2]
-            solution_wrapper = solution_wrapper.find_element(By.XPATH, "./*").find_elements(By.XPATH, "./*")[0]
+            solution_wrapper = sb.get_element("div.relative.h-full.overflow-auto.transition-opacity")
+            solution_wrapper = solution_wrapper.find_elements(By.XPATH, "./*")[2]
+            solution_wrapper = solution_wrapper.find_elements(By.XPATH, "./*")[0]
 
-            solution_wrapper = solution_wrapper.find_elements(By.XPATH, f"./*[{i}]")
-            time.sleep(4)
+            time.sleep(2) # wait for solution to load
+            solution = solution_wrapper.find_element(By.XPATH, f"./*[{j}]")
+            logger.debug(f"<{solution.tag_name} {solution.get_attribute('outerHTML').split('>')[0][len(solution.tag_name)+1:]}>")
+            solution.click()
+            logger.info(f"Clicked on solution {j} in {lang}")
+            sb.find_element(By.XPATH, "//div[contains(text(), 'All Solutions')]").click() # click on "All Solutions" to go back to the list of solutions
+            time.sleep(5)
         
         problems_data.append(data)   
 
