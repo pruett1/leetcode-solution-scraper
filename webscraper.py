@@ -123,7 +123,7 @@ with SB(uc=True) as sb:
     #close filter
     logger.info("Closing filter...")
     sb.click("svg[data-icon='filter']")
-    # time.sleep(5)
+    time.sleep(3) # wait for filter to take effect
 
     problem_list = sb.get_element("svg[data-icon='filter']")
     for _ in range(7):
@@ -218,7 +218,6 @@ with SB(uc=True) as sb:
         solution_wrapper = sb.get_element("div.relative.h-full.overflow-auto.transition-opacity")
         solution_wrapper = solution_wrapper.find_elements(By.XPATH, "./*")[2]
         solution_wrapper = solution_wrapper.find_elements(By.XPATH, "./*")[0]
-        # logger.debug(f"<{solution_wrapper.tag_name} {solution_wrapper.get_attribute('outerHTML').split('>')[0][len(solution_wrapper.tag_name)+1:]}>")
         solutions_len = len(solution_wrapper.find_elements(By.XPATH, "./*"))
 
         for j in range(1, min(5, solutions_len)+1):
@@ -281,6 +280,7 @@ with SB(uc=True) as sb:
                             logger.error(f"Could not find solution in {lang} after checking all code elements")
                             data[data_ind] += "Solution not found\n"
                             break
+                        continue  # continue to check next code element
                 else:
                     code_block_wrapper = ans.find_element(By.XPATH, "./../../../..")
                     lang_selector = code_block_wrapper.find_elements(By.XPATH, "./*")[0]
@@ -291,6 +291,16 @@ with SB(uc=True) as sb:
                         if lang in selector.text.lower():
                             lang_selector = selector
                             break
+
+                    if not lang_selector or type(lang_selector) is list:
+                        logger.error(f"lang selector not found for {lang}, trying another code element")
+                        solution_found = False
+                        sol_count += 1
+                        if sol_count > len(code_elements):
+                            logger.error(f"Could not find solution in {lang} after checking all code elements")
+                            data[data_ind] += "Solution not found\n"
+                            break
+                        continue  # continue to check next code element
 
                     logger.debug(f"Language selector: <{lang_selector.tag_name} {lang_selector.get_attribute('outerHTML').split('>')[0][len(lang_selector.tag_name)+1:]}>")
                     logger.debug(f"Language selector innerHTML: {lang_selector.get_attribute('innerHTML')}")
@@ -319,17 +329,17 @@ with SB(uc=True) as sb:
                                 logger.error(f"Could not find solution in {lang} after checking all code elements")
                                 data[data_ind] += "Solution not found\n"
                                 break
+                            continue  # continue to check next code element
                     else:
                         logger.error(f"Could not find solution in {lang} after re-selecting language")
                         data[data_ind] += "Solution not found\n"
 
-            logger.debug(f"Text in data[{data_ind}]: {data[data_ind].strip()}")
-            problems_data.append(data)
+            problems_data.append(data.copy())
+            logger.debug(f"Data collected for problem {i}, solution {j} for {lang}")
+            for key, value in data.items():
+                logger.debug(f"{key}: {value}")
             sb.find_element(By.XPATH, "//div[contains(text(), 'All Solutions')]").click() # click on "All Solutions" to go back to the list of solutions
 
-        logger.debug(f"Data collected for problem {i}")
-        for key, value in data.items():
-            logger.debug(f"{key}: {value}")
         # Go back to the problem list
         sb.driver.back()
         logger.info("Navigated back to problem list")
