@@ -22,9 +22,9 @@ logger.addHandler(file_handler)
 #     print("Invalid difficulty level. Please enter 'easy', 'med.', or 'hard'.")
 #     exit(1)
 
-# topic = input("Enter the topic (e.g., 'array', 'string'): ").strip().lower()
+# topic = input("Enter the topic (e.g. 'array', 'string'): ").strip().lower()
 
-# lang = input("Enter the programming language (e.g., 'python'): ").strip().lower()
+# lang = input("Enter the programming language (e.g. 'python', 'c++'): ").strip().lower()
 
 difficulty = "easy"
 topic = "greedy"
@@ -256,54 +256,76 @@ with SB(uc=True) as sb:
 
             time.sleep(3)
 
-            code_elements = [c for c in sb.find_elements(By.TAG_NAME, "code") if "language-" in c.get_attribute("class")]
-            ans = code_elements[-1] if code_elements else None  # get the last code element with "language-" in its class
-            
-            if ans and lang in ans.get_attribute("class").lower():
-                lines = []
-                for line_span in ans.find_elements(By.XPATH, "./span"):
-                    words = [w.text for w in line_span.find_elements(By.XPATH, "./span")]
-                    line = "".join(words)
-                    lines.append(line)
-                data[data_ind] += "\n".join(lines) + "\n"
-                logger.info(f"Collected solution in {lang}")
-                logger.debug(f"Solution text: {ans.text.strip()}")
-            else:
-                code_block_wrapper = ans.find_element(By.XPATH, "./../../../..")
-                lang_selector = code_block_wrapper.find_elements(By.XPATH, "./*")[0]
-                lang_selector = lang_selector.find_elements(By.XPATH, "./*")
-
-                for selector in lang_selector:
-                    logger.debug(f"Checking language selector: {selector.text.lower()}")
-                    if lang in selector.text.lower():
-                        lang_selector = selector
-                        break
-
-                logger.debug(f"Language selector: <{lang_selector.tag_name} {lang_selector.get_attribute('outerHTML').split('>')[0][len(lang_selector.tag_name)+1:]}>")
-                logger.debug(f"Language selector innerHTML: {lang_selector.get_attribute('innerHTML')}")
-                sb.driver.execute_script("arguments[0].scrollIntoView(true);", lang_selector)
-                lang_selector.click() # click on lang selector for code block
-                time.sleep(2)
+            solution_found = False
+            sol_count = 1
+            while not solution_found:
                 code_elements = [c for c in sb.find_elements(By.TAG_NAME, "code") if "language-" in c.get_attribute("class")]
-                ans = code_elements[-1] if code_elements else None  # get the last code element with "language-" in its class
-                if ans and lang in ans.get_attribute("class"):
-                    # Extract each line by iterating over top-level spans
+                ans = code_elements[-1*sol_count] if code_elements else None  # get the last code element with "language-" in its class
+                
+                if ans and lang in ans.get_attribute("class").lower():
                     lines = []
                     for line_span in ans.find_elements(By.XPATH, "./span"):
                         words = [w.text for w in line_span.find_elements(By.XPATH, "./span")]
                         line = "".join(words)
                         lines.append(line)
-                    data[data_ind] += "\n".join(lines) + "\n"
-                    logger.info(f"Collected solution in {lang} after re-selecting language")
-                else:
-                    logger.error(f"Could not find solution in {lang} after re-selecting language")
-                    data[data_ind] += "Solution not found\n"
+                    data[data_ind] = "\n".join(lines) + "\n"
 
-            logger.debug(f"Solution text after re-selecting language: {data[data_ind].strip()}")
+                    if "class solution" in data[data_ind].lower():
+                        solution_found = True
+                        logger.info(f"Collected solution in {lang}")
+                        logger.debug(f"Solution text: {ans.text.strip()}")
+                    else:
+                        sol_count += 1
+                        logger.warning(f"Solution {sol_count} in {lang} does not contain 'class solution', checking next code element")
+                        if sol_count > len(code_elements):
+                            logger.error(f"Could not find solution in {lang} after checking all code elements")
+                            data[data_ind] += "Solution not found\n"
+                            break
+                else:
+                    code_block_wrapper = ans.find_element(By.XPATH, "./../../../..")
+                    lang_selector = code_block_wrapper.find_elements(By.XPATH, "./*")[0]
+                    lang_selector = lang_selector.find_elements(By.XPATH, "./*")
+
+                    for selector in lang_selector:
+                        logger.debug(f"Checking language selector: {selector.text.lower()}")
+                        if lang in selector.text.lower():
+                            lang_selector = selector
+                            break
+
+                    logger.debug(f"Language selector: <{lang_selector.tag_name} {lang_selector.get_attribute('outerHTML').split('>')[0][len(lang_selector.tag_name)+1:]}>")
+                    logger.debug(f"Language selector innerHTML: {lang_selector.get_attribute('innerHTML')}")
+                    sb.driver.execute_script("arguments[0].scrollIntoView(true);", lang_selector)
+                    lang_selector.click() # click on lang selector for code block
+                    time.sleep(2)
+                    code_elements = [c for c in sb.find_elements(By.TAG_NAME, "code") if "language-" in c.get_attribute("class")]
+                    ans = code_elements[-1] if code_elements else None  # get the last code element with "language-" in its class
+                    if ans and lang in ans.get_attribute("class"):
+                        # Extract each line by iterating over top-level spans
+                        lines = []
+                        for line_span in ans.find_elements(By.XPATH, "./span"):
+                            words = [w.text for w in line_span.find_elements(By.XPATH, "./span")]
+                            line = "".join(words)
+                            lines.append(line)
+                        data[data_ind] = "\n".join(lines) + "\n"
+
+                        if "class solution" in data[data_ind].lower():
+                            solution_found = True
+                            logger.info(f"Collected solution in {lang}")
+                            logger.debug(f"Solution text: {ans.text.strip()}")
+                        else:
+                            sol_count += 1
+                            logger.warning(f"Solution {sol_count} in {lang} does not contain 'class solution', checking next code element")
+                            if sol_count > len(code_elements):
+                                logger.error(f"Could not find solution in {lang} after checking all code elements")
+                                data[data_ind] += "Solution not found\n"
+                                break
+                    else:
+                        logger.error(f"Could not find solution in {lang} after re-selecting language")
+                        data[data_ind] += "Solution not found\n"
+
+            logger.debug(f"Text in data[{data_ind}]: {data[data_ind].strip()}")
             problems_data.append(data)
             sb.find_element(By.XPATH, "//div[contains(text(), 'All Solutions')]").click() # click on "All Solutions" to go back to the list of solutions
-        
-            
 
         logger.debug(f"Data collected for problem {i}")
         for key, value in data.items():
