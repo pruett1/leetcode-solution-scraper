@@ -137,8 +137,8 @@ with SB(uc=True) as sb:
 
     problems_data = []
 
-    # for i in range(2, problem_list_len + 1): # the first problem is always the daily problem which may not be the right difficulty/topic
-    for i in range(2, 3):
+    for i in range(2, problem_list_len + 1): # the first problem is always the daily problem which may not be the right difficulty/topic
+    # for i in range(2, 3):
         # Because changing the page, need to re-fetch the problem list each time
         sb.wait_for_element("svg[data-icon='filter']") # wait for page to load
         problem_list = sb.get_element("svg[data-icon='filter']")
@@ -275,7 +275,7 @@ with SB(uc=True) as sb:
                         logger.debug(f"Solution text: {ans.text.strip()}")
                     else:
                         sol_count += 1
-                        logger.warning(f"Solution {sol_count} in {lang} does not contain 'class solution', checking next code element")
+                        logger.warning(f"Code[-{sol_count}] in {lang} does not contain 'class solution', checking next code element")
                         if sol_count > len(code_elements):
                             logger.error(f"Could not find solution in {lang} after checking all code elements")
                             data[data_ind] += "Solution not found\n"
@@ -305,7 +305,7 @@ with SB(uc=True) as sb:
                     logger.debug(f"Language selector: <{lang_selector.tag_name} {lang_selector.get_attribute('outerHTML').split('>')[0][len(lang_selector.tag_name)+1:]}>")
                     logger.debug(f"Language selector innerHTML: {lang_selector.get_attribute('innerHTML')}")
                     sb.driver.execute_script("arguments[0].scrollIntoView(true);", lang_selector)
-                    lang_selector.click() # click on lang selector for code block
+                    sb.driver.execute_script("arguments[0].click();", lang_selector)  # force click via JS to avoid interception
                     time.sleep(2)
                     code_elements = [c for c in sb.find_elements(By.TAG_NAME, "code") if "language-" in c.get_attribute("class")]
                     ans = code_elements[-1] if code_elements else None  # get the last code element with "language-" in its class
@@ -324,7 +324,7 @@ with SB(uc=True) as sb:
                             logger.debug(f"Solution text: {ans.text.strip()}")
                         else:
                             sol_count += 1
-                            logger.warning(f"Solution {sol_count} in {lang} does not contain 'class solution', checking next code element")
+                            logger.warning(f"Code[-{sol_count}] in {lang} does not contain 'class solution', checking next code element")
                             if sol_count > len(code_elements):
                                 logger.error(f"Could not find solution in {lang} after checking all code elements")
                                 data[data_ind] += "Solution not found\n"
@@ -345,6 +345,7 @@ with SB(uc=True) as sb:
         logger.info("Navigated back to problem list")
         time.sleep(3) # give time for the page to load
 
-    with open(f"output_{difficulty}_{topic}.json", "w") as f:
-        json.dump(problems_data, f, indent=4)
-        logger.info(f"Saved problems to output_{difficulty}_{topic}.json")
+    with open(f"output_{difficulty}_{topic}.jsonl", "w") as f:
+        for problem in problems_data:
+            f.write(json.dumps(problem) + "\n")
+        logger.info(f"Saved problems to output_{difficulty}_{topic}.jsonl")
