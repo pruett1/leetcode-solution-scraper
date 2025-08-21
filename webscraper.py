@@ -221,7 +221,7 @@ with SB(uc=True) as sb:
         # logger.debug(f"<{solution_wrapper.tag_name} {solution_wrapper.get_attribute('outerHTML').split('>')[0][len(solution_wrapper.tag_name)+1:]}>")
         solutions_len = len(solution_wrapper.find_elements(By.XPATH, "./*"))
 
-        for j in range(1, min(4, solutions_len)+1):
+        for j in range(1, min(5, solutions_len)+1):
             # when go back from solution, the language filter sometimes resets so need to select language every time
             sb.wait_for_element(By.XPATH, "//span[contains(text(), 'All')]")
             all_langs = sb.find_elements(By.XPATH, "//span[contains(text(), 'All')]")
@@ -234,10 +234,10 @@ with SB(uc=True) as sb:
             for language in lang_wrapper.find_elements(By.XPATH, "./*"):
                 logger.debug(f"Checking language: {language.text.lower()}")
                 if language.text.lower() == lang:
-                    logger.info(f"Selecting language: {language.text}")
                     if language.get_attribute("style") == "order: -1;":
-                        logger.debug("Language is already selected, skipping click")
+                        logger.debug("Language is already selected, skipping selection")
                         break
+                    logger.info(f"Selecting language: {language.text}")
                     language.click()
                     break
 
@@ -247,6 +247,9 @@ with SB(uc=True) as sb:
 
             time.sleep(2) # wait for solution to load
             solution = solution_wrapper.find_element(By.XPATH, f"./*[{j}]")
+            if "group/ads" in solution.get_attribute("class"):
+                logger.warning(f"Detected solution {j} is an ad, skipping...")
+                continue
             logger.debug(f"<{solution.tag_name} {solution.get_attribute('outerHTML').split('>')[0][len(solution.tag_name)+1:]}>")
             solution.click()
             logger.info(f"Clicked on solution {j} in {lang}")
