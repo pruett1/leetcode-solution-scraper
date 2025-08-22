@@ -5,6 +5,9 @@ import logging
 from data import login
 import json
 from math import floor
+import os
+
+os.makedirs('out', exist_ok=True)
 
 class NewLineFormatter(logging.Formatter):
     def format(self, record):
@@ -14,7 +17,7 @@ class NewLineFormatter(logging.Formatter):
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
-file_handler = logging.FileHandler('webscraper.log', mode='w')
+file_handler = logging.FileHandler('out/webscraper.log', mode='w')
 file_handler.setFormatter(NewLineFormatter('%(asctime)s - %(levelname)s - %(message)s'))
 logger.addHandler(file_handler)
 
@@ -372,7 +375,7 @@ with SB(uc=True) as sb:
             logger.info("Navigated back to problem list")
             time.sleep(3) # give time for the page to load
     finally:
-        with open(f"output_{difficulty}_{topic}.jsonl", "w") as f:
+        with open(f"out/{difficulty}_{topic}_{lang}_{percent}_{target_num_sols}_{int(time.time())}.jsonl", "w") as f:
             for problem in problems_data:
                 f.write(json.dumps(problem) + "\n")
             logger.info(f"Saved problems to output_{difficulty}_{topic}.jsonl")
