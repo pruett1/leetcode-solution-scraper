@@ -4,28 +4,48 @@ import time
 import logging
 from data import login
 import json
+from math import floor
 
-# difficulty = input("Enter the difficulty level (easy, med., hard): ").strip().lower()
-# if difficulty not in ["easy", "med.", "hard"]:
-#     print("Invalid difficulty level. Please enter 'easy', 'med.', or 'hard'.")
-#     exit(1)
-
-# topic = input("Enter the topic (e.g., 'array', 'string'): ").strip().lower()
-# if topic not in ["array", "string"]:
-#     print("Invalid topic. Please enter a valid topic.")
-#     exit(1)
-
-logging.basicConfig(filename='webscraper.log', 
-                    format='%(asctime)s - %(levelname)s - %(message)s',
-                    filemode='w')
+class NewLineFormatter(logging.Formatter):
+    def format(self, record):
+        message = super().format(record)
+        return message.replace("\n", "\n                                  ")
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
-difficulty = "easy"
-topic = "greedy"
+file_handler = logging.FileHandler('webscraper.log', mode='w')
+file_handler.setFormatter(NewLineFormatter('%(asctime)s - %(levelname)s - %(message)s'))
+logger.addHandler(file_handler)
 
-logger.info(f"Starting webscraper with difficulty: {difficulty}, topic: {topic}")
+print("\nLeetCode Solution Scraper\n\nThis will scrape for solutions based on difficulty, topic, and language\n")
+print("In all following prompts leave the input blank for the default values")
+print("Default values are: difficulty = easy\n topic = array\n lang = python\n percent of questions = 0.75\n target number of solutions per problem = 5\n")
+
+difficulty = input("Enter the difficulty level (easy, med., hard): ").strip().lower()
+if difficulty not in ["easy", "med.", "hard", ""]:
+    print("Invalid difficulty level. Please enter 'easy', 'med.', or 'hard'.")
+    exit(1)
+difficulty = difficulty if difficulty != "" else "easy"
+
+topic = input("Enter the topic (e.g. 'array', 'string'): ").strip().lower()
+topic = topic if topic != "" else "array"
+
+lang = input("Enter the programming language (e.g. 'python', 'c++'): ").strip().lower()
+if lang not in ["python", "c++", "java", ""]: # Current langauages supported from logic in script for solution identification
+    print("Invalid programming language. Please enter 'python', 'c++', or 'java'.")
+    exit(1)
+lang = lang if lang != "" else "python"
+
+percent = input("Enter the percentage of problems to scrape (0.25 for 25%, 0.5 for 50%, etc.): ").strip()
+percent = float(percent) if percent != "" else 0.75
+
+target_num_sols = input("Enter the target number of solutions per problem: ").strip()
+target_num_sols = int(target_num_sols) if target_num_sols != "" else 5
+
+print(f"\nStarting webscraper...\n difficulty: {difficulty}\n topic: {topic}\n language: {lang}\n percent: {percent}\n target number of solutions: {target_num_sols}\n")
+
+logger.info(f"Starting webscraper with difficulty: {difficulty}, topic: {topic}, lang: {lang}, percent: {percent}, target_num_sols: {target_num_sols}")
 
 with SB(uc=True) as sb:
     # login and bypass captcha
@@ -118,7 +138,7 @@ with SB(uc=True) as sb:
     #close filter
     logger.info("Closing filter...")
     sb.click("svg[data-icon='filter']")
-    # time.sleep(5)
+    time.sleep(3) # wait for filter to take effect
 
     problem_list = sb.get_element("svg[data-icon='filter']")
     for _ in range(7):
@@ -129,10 +149,12 @@ with SB(uc=True) as sb:
     problem_list = problem_list.find_elements(By.XPATH, "./*")[1].find_element(By.XPATH, "./*")
     logger.info(f"problem_list children len = {len(problem_list.find_elements(By.XPATH, './*'))}")
     problem_list_len = len(problem_list.find_elements(By.XPATH, "./*"))
+    problems_num = floor(problem_list_len*percent) + 1 # +1 because 1 indexed
 
     problems_data = []
 
-    for i in range(1, problem_list_len + 1):
+    for i in range(2, problems_num): # the first problem is always the daily problem which may not be the right difficulty/topic
+    # for i in range(2, 3): # for testing, only scrape the first problem
         # Because changing the page, need to re-fetch the problem list each time
         sb.wait_for_element("svg[data-icon='filter']") # wait for page to load
         problem_list = sb.get_element("svg[data-icon='filter']")
@@ -204,15 +226,152 @@ with SB(uc=True) as sb:
         text = text.strip()[13:] # remove "Constraints:\n" prefix
         data[data_ind] = text.split("\n") if data_ind == "constraints" else text # split constraints into list
 
-        problems_data.append(data)
+        # get solution
+        logger.info("Finished collecting problem description, now collecting solution...")
+        data_ind = "solution"
+        sb.get_element("div[id='solutions_tab']").click()
 
-        logger.debug(f"Data collected for problem {i}: {data}")
+        solution_wrapper = sb.get_element("div.relative.h-full.overflow-auto.transition-opacity")
+        solution_wrapper = solution_wrapper.find_elements(By.XPATH, "./*")[2]
+        solution_wrapper = solution_wrapper.find_elements(By.XPATH, "./*")[0]
+        solutions_len = len(solution_wrapper.find_elements(By.XPATH, "./*"))
+
+        for j in range(1, min(target_num_sols, solutions_len)+1):
+            # when go back from solution, the language filter sometimes resets so need to select language every time
+            sb.wait_for_element(By.XPATH, "//span[contains(text(), 'All')]")
+            all_langs = sb.find_elements(By.XPATH, "//span[contains(text(), 'All')]")
+            logger.debug(f"Found {len(all_langs)} 'All' language selectors")
+            
+            assert all_langs, "No all language selector found"
+            # Get the next sibling element after 'All' (the language selector)
+            lang_wrapper = all_langs[0].find_element(By.XPATH, "..").find_elements(By.XPATH, "./*")[2]
+
+            for language in lang_wrapper.find_elements(By.XPATH, "./*"):
+                logger.debug(f"Checking language: {language.text.lower()}")
+                if lang in language.text.lower():
+                    if language.get_attribute("style") == "order: -1;":
+                        logger.debug("Language is already selected, skipping selection")
+                        break
+                    logger.info(f"Selecting language: {language.text}")
+                    language.click()
+                    break
+
+            solution_wrapper = sb.get_element("div.relative.h-full.overflow-auto.transition-opacity")
+            solution_wrapper = solution_wrapper.find_elements(By.XPATH, "./*")[2]
+            solution_wrapper = solution_wrapper.find_elements(By.XPATH, "./*")[0]
+
+            time.sleep(2) # wait for solution to load
+            solution = solution_wrapper.find_element(By.XPATH, f"./*[{j}]")
+            if "group/ads" in solution.get_attribute("class"):
+                logger.warning(f"Detected solution {j} is an ad, skipping...")
+                continue
+            logger.debug(f"<{solution.tag_name} {solution.get_attribute('outerHTML').split('>')[0][len(solution.tag_name)+1:]}>")
+            solution.click()
+            logger.info(f"Clicked on solution {j} in {lang}")
+
+            time.sleep(3)
+
+            # Check if premium-only message exists
+            premium_message = "Thanks for using LeetCode! To view this solution you must subscribe to premium."
+            premium_divs = sb.find_elements(By.XPATH, f".//div[contains(text(), '{premium_message}')]")
+            if premium_divs:
+                logger.warning("Premium-only problem detected, skipping...")
+                sb.find_element(By.XPATH, "//div[contains(text(), 'All Solutions')]").click() # go back to solution list
+                continue
+
+            solution_found = False
+            sol_count = 1
+            while not solution_found:
+                code_elements = [c for c in sb.find_elements(By.TAG_NAME, "code") if "language-" in c.get_attribute("class")]
+                ans = code_elements[-1*sol_count] if code_elements else None  # get the last code element with "language-" in its class
+                
+                if ans and lang in ans.get_attribute("class").lower():
+                    lines = []
+                    for line_span in ans.find_elements(By.XPATH, "./span"):
+                        words = [w.text for w in line_span.find_elements(By.XPATH, "./span")]
+                        line = "".join(words)
+                        lines.append(line)
+                    data[data_ind] = "\n".join(lines) + "\n"
+
+                    if "class solution" in data[data_ind].lower():
+                        solution_found = True
+                        logger.info(f"Collected solution in {lang}")
+                        logger.debug(f"Solution text: {ans.text.strip()}")
+                    else:
+                        sol_count += 1
+                        logger.warning(f"Code[-{sol_count}] in {lang} does not contain 'class solution', checking next code element")
+                        if sol_count > len(code_elements):
+                            logger.error(f"Could not find solution in {lang} after checking all code elements")
+                            data[data_ind] += "Solution not found\n"
+                            break  # break out of while loop to go to next solution
+                        continue  # continue to check next code element
+                else:
+                    code_block_wrapper = ans.find_element(By.XPATH, "./../../../..")
+                    lang_selector = code_block_wrapper.find_elements(By.XPATH, "./*")[0]
+                    lang_selector = lang_selector.find_elements(By.XPATH, "./*")
+
+                    for selector in lang_selector:
+                        logger.debug(f"Checking language selector: {selector.text.lower()}")
+                        if lang in selector.text.lower():
+                            lang_selector = selector
+                            break
+
+                    if not lang_selector or type(lang_selector) is list:
+                        logger.error(f"lang selector not found for {lang}, trying another code element")
+                        solution_found = False
+                        sol_count += 1
+                        if sol_count > len(code_elements):
+                            logger.error(f"Could not find solution in {lang} after checking all code elements")
+                            data[data_ind] += "Solution not found\n"
+                            break
+                        continue  # continue to check next code element
+
+                    logger.debug(f"Language selector: <{lang_selector.tag_name} {lang_selector.get_attribute('outerHTML').split('>')[0][len(lang_selector.tag_name)+1:]}>")
+                    logger.debug(f"Language selector innerHTML: {lang_selector.get_attribute('innerHTML')}")
+                    sb.driver.execute_script("arguments[0].scrollIntoView(true);", lang_selector)
+                    sb.driver.execute_script("arguments[0].click();", lang_selector)  # force click via JS to avoid interception
+                    time.sleep(2)
+                    code_elements = [c for c in sb.find_elements(By.TAG_NAME, "code") if "language-" in c.get_attribute("class")]
+                    ans = code_elements[-1] if code_elements else None  # get the last code element with "language-" in its class
+                    if ans and lang in ans.get_attribute("class"):
+                        # Extract each line by iterating over top-level spans
+                        lines = []
+                        for line_span in ans.find_elements(By.XPATH, "./span"):
+                            words = [w.text for w in line_span.find_elements(By.XPATH, "./span")]
+                            line = "".join(words)
+                            lines.append(line)
+                        data[data_ind] = "\n".join(lines) + "\n"
+
+                        if "class solution" in data[data_ind].lower():
+                            solution_found = True
+                            logger.info(f"Collected solution in {lang}")
+                            logger.debug(f"Solution text: {ans.text.strip()}")
+                        else:
+                            sol_count += 1
+                            logger.warning(f"Code[-{sol_count}] in {lang} does not contain 'class solution', checking next code element")
+                            if sol_count > len(code_elements):
+                                logger.error(f"Could not find solution in {lang} after checking all code elements")
+                                data[data_ind] += "Solution not found\n"
+                                break
+                            continue  # continue to check next code element
+                    else:
+                        logger.error(f"Could not find solution in {lang} after re-selecting language")
+                        data[data_ind] += "Solution not found\n"
+                        break
+
+            if data[data_ind] != "Solution not found\n":
+                problems_data.append(data.copy())
+            logger.debug(f"Data collected for problem {i}, solution {j} for {lang}")
+            for key, value in data.items():
+                logger.debug(f"{key}: {value}")
+            sb.find_element(By.XPATH, "//div[contains(text(), 'All Solutions')]").click() # click on "All Solutions" to go back to the list of solutions
 
         # Go back to the problem list
         sb.driver.back()
         logger.info("Navigated back to problem list")
         time.sleep(3) # give time for the page to load
 
-    with open(f"output_{difficulty}_{topic}.json", "w") as f:
-        json.dump(problems_data, f, indent=4)
-        logger.info(f"Saved problems to output_{difficulty}_{topic}.json")
+    with open(f"output_{difficulty}_{topic}.jsonl", "w") as f:
+        for problem in problems_data:
+            f.write(json.dumps(problem) + "\n")
+        logger.info(f"Saved problems to output_{difficulty}_{topic}.jsonl")
