@@ -4,6 +4,7 @@ import time
 import logging
 from data import login
 import json
+from math import floor
 
 class NewLineFormatter(logging.Formatter):
     def format(self, record):
@@ -17,20 +18,34 @@ file_handler = logging.FileHandler('webscraper.log', mode='w')
 file_handler.setFormatter(NewLineFormatter('%(asctime)s - %(levelname)s - %(message)s'))
 logger.addHandler(file_handler)
 
-# difficulty = input("Enter the difficulty level (easy, med., hard): ").strip().lower()
-# if difficulty not in ["easy", "med.", "hard"]:
-#     print("Invalid difficulty level. Please enter 'easy', 'med.', or 'hard'.")
-#     exit(1)
+print("\nLeetCode Solution Scraper\n\nThis will scrape for solutions based on difficulty, topic, and language\n")
+print("In all following prompts leave the input blank for the default values")
+print("Default values are: difficulty = easy\n topic = array\n lang = python\n percent of questions = 0.75\n target number of solutions per problem = 5\n")
 
-# topic = input("Enter the topic (e.g. 'array', 'string'): ").strip().lower()
+difficulty = input("Enter the difficulty level (easy, med., hard): ").strip().lower()
+if difficulty not in ["easy", "med.", "hard", ""]:
+    print("Invalid difficulty level. Please enter 'easy', 'med.', or 'hard'.")
+    exit(1)
+difficulty = difficulty if difficulty != "" else "easy"
 
-# lang = input("Enter the programming language (e.g. 'python', 'c++'): ").strip().lower()
+topic = input("Enter the topic (e.g. 'array', 'string'): ").strip().lower()
+topic = topic if topic != "" else "array"
 
-difficulty = "easy"
-topic = "greedy"
-lang = "python"
+lang = input("Enter the programming language (e.g. 'python', 'c++'): ").strip().lower()
+if lang not in ["python", "c++", "java", ""]: # Current langauages supported from logic in script for solution identification
+    print("Invalid programming language. Please enter 'python', 'c++', or 'java'.")
+    exit(1)
+lang = lang if lang != "" else "python"
 
-logger.info(f"Starting webscraper with difficulty: {difficulty}, topic: {topic}")
+percent = input("Enter the percentage of problems to scrape (0.25 for 25%, 0.5 for 50%, etc.): ").strip()
+percent = float(percent) if percent != "" else 0.75
+
+target_num_sols = input("Enter the target number of solutions per problem: ").strip()
+target_num_sols = int(target_num_sols) if target_num_sols != "" else 5
+
+print(f"\nStarting webscraper...\n difficulty: {difficulty}\n topic: {topic}\n language: {lang}\n percent: {percent}\n target number of solutions: {target_num_sols}\n")
+
+logger.info(f"Starting webscraper with difficulty: {difficulty}, topic: {topic}, lang: {lang}, percent: {percent}, target_num_sols: {target_num_sols}")
 
 with SB(uc=True) as sb:
     # login and bypass captcha
@@ -134,10 +149,11 @@ with SB(uc=True) as sb:
     problem_list = problem_list.find_elements(By.XPATH, "./*")[1].find_element(By.XPATH, "./*")
     logger.info(f"problem_list children len = {len(problem_list.find_elements(By.XPATH, './*'))}")
     problem_list_len = len(problem_list.find_elements(By.XPATH, "./*"))
+    problems_num = floor(problem_list_len*percent) + 1 # +1 because 1 indexed
 
     problems_data = []
 
-    for i in range(2, problem_list_len + 1): # the first problem is always the daily problem which may not be the right difficulty/topic
+    for i in range(2, problems_num): # the first problem is always the daily problem which may not be the right difficulty/topic
     # for i in range(2, 3): # for testing, only scrape the first problem
         # Because changing the page, need to re-fetch the problem list each time
         sb.wait_for_element("svg[data-icon='filter']") # wait for page to load
@@ -220,7 +236,7 @@ with SB(uc=True) as sb:
         solution_wrapper = solution_wrapper.find_elements(By.XPATH, "./*")[0]
         solutions_len = len(solution_wrapper.find_elements(By.XPATH, "./*"))
 
-        for j in range(1, min(5, solutions_len)+1):
+        for j in range(1, min(target_num_sols, solutions_len)+1):
             # when go back from solution, the language filter sometimes resets so need to select language every time
             sb.wait_for_element(By.XPATH, "//span[contains(text(), 'All')]")
             all_langs = sb.find_elements(By.XPATH, "//span[contains(text(), 'All')]")
