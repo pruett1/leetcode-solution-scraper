@@ -138,7 +138,7 @@ with SB(uc=True) as sb:
     problems_data = []
 
     for i in range(2, problem_list_len + 1): # the first problem is always the daily problem which may not be the right difficulty/topic
-    # for i in range(2, 3):
+    # for i in range(2, 3): # for testing, only scrape the first problem
         # Because changing the page, need to re-fetch the problem list each time
         sb.wait_for_element("svg[data-icon='filter']") # wait for page to load
         problem_list = sb.get_element("svg[data-icon='filter']")
@@ -255,6 +255,14 @@ with SB(uc=True) as sb:
 
             time.sleep(3)
 
+            # Check if premium-only message exists
+            premium_message = "Thanks for using LeetCode! To view this solution you must subscribe to premium."
+            premium_divs = sb.find_elements(By.XPATH, f".//div[contains(text(), '{premium_message}')]")
+            if premium_divs:
+                logger.warning("Premium-only problem detected, skipping...")
+                sb.find_element(By.XPATH, "//div[contains(text(), 'All Solutions')]").click() # go back to solution list
+                continue
+
             solution_found = False
             sol_count = 1
             while not solution_found:
@@ -279,7 +287,7 @@ with SB(uc=True) as sb:
                         if sol_count > len(code_elements):
                             logger.error(f"Could not find solution in {lang} after checking all code elements")
                             data[data_ind] += "Solution not found\n"
-                            break
+                            break  # break out of while loop to go to next solution
                         continue  # continue to check next code element
                 else:
                     code_block_wrapper = ans.find_element(By.XPATH, "./../../../..")
@@ -333,8 +341,10 @@ with SB(uc=True) as sb:
                     else:
                         logger.error(f"Could not find solution in {lang} after re-selecting language")
                         data[data_ind] += "Solution not found\n"
+                        break
 
-            problems_data.append(data.copy())
+            if data[data_ind] != "Solution not found\n":
+                problems_data.append(data.copy())
             logger.debug(f"Data collected for problem {i}, solution {j} for {lang}")
             for key, value in data.items():
                 logger.debug(f"{key}: {value}")
