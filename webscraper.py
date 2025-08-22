@@ -42,6 +42,8 @@ def main():
 
 if __name__ == "__main__":
     start_time = time.time()
-    main()
-    end_time = time.time()
-    print(f"\nTotal time: {((end_time - start_time)/60):.2f} minutes")
+    try:
+        main()
+    finally:
+        end_time = time.time()
+        print(f"\nTotal time: {((end_time - start_time)/60):.2f} minutes")
